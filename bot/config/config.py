@@ -18,24 +18,24 @@ class Settings(BaseSettings):
     AUTO_SELL_WORMS: bool = False
     QUANTITY_TO_KEEP: dict = {
         "common": {
-            "quantity_to_keep": 2,
-            "sale_price": 1
+            "quantity_to_keep": 3,
+            "sale_price": 0.44
         },
         "uncommon": {
-            "quantity_to_keep": 2,
-            "sale_price": 0
+            "quantity_to_keep": 3,
+            "sale_price": 0.59
         },
         "rare": {
-            "quantity_to_keep": -1,
-            "sale_price": 0
+            "quantity_to_keep": 2,
+            "sale_price": 2.76
         },
         "epic": {
-            "quantity_to_keep": -1,
-            "sale_price": 0
+            "quantity_to_keep": 5,
+            "sale_price": 10.5
         },
         "legendary": {
-            "quantity_to_keep": -1,
-            "sale_price": 0
+            "quantity_to_keep": 10,
+            "sale_price": 100
         }
     }
 

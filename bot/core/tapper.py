@@ -41,6 +41,10 @@ api_inv = "https://elb.seeddao.org/api/v1/worms/me"
 api_sell = "https://elb.seeddao.org/api/v1/market-item/add"
 new_user_api = 'https://elb.seeddao.org/api/v1/profile2'
 
+api_worm_market = "https://elb.seeddao.org/api/v1/market/v2?market_type=worm&worm_type=&sort_by_price=ASC&sort_by_updated_at=&page=1"
+api_egg_market = "https://elb.seeddao.org/api/v1/market/v2?market_type=egg&egg_type=&sort_by_price=ASC&sort_by_updated_at=&page=1"
+api_buy = "https://elb.seeddao.org/api/v1/market-item/buy"
+
 
 class Tapper:
     def __init__(self, tg_client: Client):
@@ -207,6 +211,16 @@ class Tapper:
         if response.status == 200:
             balance_info = await response.json()
             logger.info(f"{self.session_name} | <cyan>Balance: {balance_info['data'] / 1000000000}</cyan>")
+            return True
+        else:
+            logger.error(f"{self.session_name} | <red>Balance: Error | {response.status}</red>")
+
+    async def verify_worm_market(self, http_client: aiohttp.ClientSession):
+        response = await http_client.get(url=api_worm_market)
+        if response.status == 200:
+            worm_market_info = await response.json()
+            logger.info(f"{self.session_name} | <cyan>Worm market: {worm_market_info['data']}</cyan>")
+            print(worm_market_info)
             return True
         else:
             logger.error(f"{self.session_name} | <red>Balance: Error | {response.status}</red>")
@@ -393,6 +407,29 @@ class Tapper:
         else:
             return 0
 
+    async def get_price_info(self, worm_type, http_client: aiohttp.ClientSession):
+        api = f"https://elb.seeddao.org/api/v1/market/v2?market_type=worm&worm_type={worm_type}&sort_by_price=ASC&sort_by_updated_at=&page=1"
+        response = await http_client.get(api)
+        if response.status == 200:
+            json_r = await response.json()
+            return json_r['data']['items'][0]
+        else:
+            return None
+
+    async def buy_worm(self, market_id, worm_info, price, http_client: aiohttp.ClientSession):
+        payload = {
+            "market_id": market_id
+        }
+        response = await http_client.post(api_buy, json=payload)
+        if response.status == 200:
+            logger.success(
+                f"{self.session_name} | <green>Buy {worm_info} worm successfully, price: {price}</green>")
+        else:
+            response_data = await response.json()
+            print(response_data)
+            logger.info(f"{self.session_name} | Failed to buy {worm_info} worm, response code:{response.status}")
+            return None
+
     async def get_sale_data(self, http_client: aiohttp.ClientSession):
         api = "https://elb.seeddao.org/api/v1/history-log-market/me?market_type=worm&page=1&history_type=sell"
         response = await http_client.get(api)
@@ -577,10 +614,9 @@ class Tapper:
                             worm['type']]:
                             if settings.QUANTITY_TO_KEEP[worm['type']]['sale_price'] == 0:
                                 price_to_sell = await self.get_price(worm['type'], http_client)
-
                             else:
-                                price_to_sell = settings.QUANTITY_TO_KEEP[worm['type']]['sale_price'] * (10 ** 9)
-                            # print(f"Sell {worm['type']} , price: {price_to_sell/1000000000}")
+                                price_to_sell = int(settings.QUANTITY_TO_KEEP[worm['type']]['sale_price'] * (10 ** 9))
+                            print(f"Sell {worm['type']} , price: {price_to_sell/1000000000}")
                             await self.sell_worm(worm['id'], price_to_sell, worm['type'], http_client)
                             self.worm_in_inv[worm['type']] -= 1
 
@@ -588,9 +624,82 @@ class Tapper:
                 if settings.AUTO_CLEAR_TASKS:
                     await self.fetch_tasks(http_client)
 
+                # await self.verify_worm_market(http_client)
+                attempts = 30;
+                while attempts>0:
+                    attempts -= 1
+
+                    # worm_to_buy = await self.get_price_info('rare', http_client)
+                    # if (worm_to_buy):
+                    #     price_to_buy = worm_to_buy['price_gross']/1000000000
+                    #     logger.info(f"Rare <yellow>{price_to_buy}</yellow>")
+                    #     if price_to_buy<=2:
+                    #         logger.info(f"Rare <red>{price_to_buy}</red>")
+                    #         logger.info(f"Rare <blue>{worm_to_buy}</blue>")
+                    #         await self.buy_worm( worm_to_buy['id'], worm_to_buy, price_to_buy, http_client)
+                    #     await asyncio.sleep(delay=randint(10, 15))
+
+                    worm_to_buy = await self.get_price_info('epic', http_client)
+                    if (worm_to_buy):
+                        price_to_buy = worm_to_buy['price_gross']/1000000000
+                        logger.info(f"Epic <yellow>{price_to_buy}</yellow>")
+                        if price_to_buy<=8:
+                            logger.info(f"Epic <red>{price_to_buy}</red>")
+                            logger.info(f"Epic <blue>{worm_to_buy}</blue>")
+                            await self.buy_worm( worm_to_buy['id'], worm_to_buy, price_to_buy, http_client)
+                        await asyncio.sleep(delay=randint(5, 10))
+
+                    # worm_to_buy = await self.get_price_info('legendary', http_client)
+                    # if (worm_to_buy):
+                    #     price_to_buy = worm_to_buy['price_gross']/1000000000
+                    #     logger.info(f"Legendary <yellow>{price_to_buy}</yellow>")
+                    #     if price_to_buy<=60:
+                    #         logger.info(f"Legendary <red>{price_to_buy}</red>")
+                    #         logger.info(f"Legendary <blue>{worm_to_buy}</blue>")
+                    #         await self.buy_worm( worm_to_buy['id'], worm_to_buy, price_to_buy, http_client)
+                    #     await asyncio.sleep(delay=randint(10, 15))
+
+                    await asyncio.sleep(delay=60)
+
+                attempts = 30;
+                while attempts>0:
+                    attempts -= 1
+
+                    # worm_to_buy = await self.get_price_info('rare', http_client)
+                    # if (worm_to_buy):
+                    #     price_to_buy = worm_to_buy['price_gross']/1000000000
+                    #     logger.info(f"Rare <yellow>{price_to_buy}</yellow>")
+                    #     if price_to_buy<=2:
+                    #         logger.info(f"Rare <red>{price_to_buy}</red>")
+                    #         logger.info(f"Rare <blue>{worm_to_buy}</blue>")
+                    #         await self.buy_worm( worm_to_buy['id'], worm_to_buy, price_to_buy, http_client)
+                    #     await asyncio.sleep(delay=randint(10, 15))
+
+                    # worm_to_buy = await self.get_price_info('epic', http_client)
+                    # if (worm_to_buy):
+                    #     price_to_buy = worm_to_buy['price_gross']/1000000000
+                    #     logger.info(f"Epic <yellow>{price_to_buy}</yellow>")
+                    #     if price_to_buy<=8:
+                    #         logger.info(f"Epic <red>{price_to_buy}</red>")
+                    #         logger.info(f"Epic <blue>{worm_to_buy}</blue>")
+                    #         await self.buy_worm( worm_to_buy['id'], worm_to_buy, price_to_buy, http_client)
+                    #     await asyncio.sleep(delay=randint(5, 10))
+
+                    worm_to_buy = await self.get_price_info('legendary', http_client)
+                    if (worm_to_buy):
+                        price_to_buy = worm_to_buy['price_gross']/1000000000
+                        logger.info(f"Legendary <yellow>{price_to_buy}</yellow>")
+                        if price_to_buy<=60:
+                            logger.info(f"Legendary <red>{price_to_buy}</red>")
+                            logger.info(f"Legendary <blue>{worm_to_buy}</blue>")
+                            await self.buy_worm( worm_to_buy['id'], worm_to_buy, price_to_buy, http_client)
+                        await asyncio.sleep(delay=randint(10, 15))
+
+                    await asyncio.sleep(delay=60)
+
                 delay_time = randint(2800, 3600)
                 logger.info(f"{self.session_name} | Completed {self.session_name}, waiting {delay_time} seconds...")
-                await asyncio.sleep(delay=delay_time)
+                # await asyncio.sleep(delay=delay_time)
             except InvalidSession as error:
                 raise error
 
@@ -603,7 +712,7 @@ class Tapper:
 async def run_tapper(tg_client: Client, proxy: str | None):
 
     try:
-        sleep_ = randint(1, 25)
+        sleep_ = randint(1, 5)
         logger.info(f"Wait {sleep_}s")
         await asyncio.sleep(sleep_)
         await Tapper(tg_client=tg_client).run(proxy=proxy)
